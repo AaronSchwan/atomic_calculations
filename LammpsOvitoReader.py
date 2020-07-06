@@ -9,8 +9,6 @@ import time
 #non-default imports
 import pandas as pd
 
-
-
 class dumpFile():
 
     def __init__(self,file_path):
