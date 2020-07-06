@@ -97,19 +97,3 @@ def data_class_to_lammps(data_class,file_path):
     with open(file_path,'w') as file:
         file.write("# \n# ")
     data_class.data.to_csv(file_path, index = False,mode="a",sep = ' ')
-
-
-
-start = time.time()
-testdata2 = dataFile(r"C:\Users\Aaron Schwan\Desktop\Summer REU Simulations\NVT\NVT_running_NEGB\data.X")
-print(testdata2.data)
-end = time.time()
-print(end - start)
-
-start = time.time()
-data_class_to_lammps(testdata2,r"C:\Users\Aaron Schwan\Desktop\data.X")
-end = time.time()
-print(end - start)
-
-testdata3 = dataFile(r"C:\Users\Aaron Schwan\Desktop\data.X")
-print(testdata3.data)
