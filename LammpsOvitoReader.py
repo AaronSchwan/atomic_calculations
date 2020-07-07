@@ -99,3 +99,6 @@ def data_class_to_lammps(data_class,file_path):
     with open(file_path,'w') as file:
         file.write("# \n# ")
     data_class.data.to_csv(file_path, index = False,mode="a",sep = ' ')
+
+def single_file_dump(file_path):
+    full_data = pd.read_csv(file_path)

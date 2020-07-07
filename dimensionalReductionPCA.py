@@ -127,6 +127,7 @@ class FittingPCA():
             if ind == 0:
                 #Setting base dataframe
                 data = lor.dumpFile(file).atoms
+
             else:
                 #appending to base dataframe
                 data_grab = lor.dumpFile(file).atoms
