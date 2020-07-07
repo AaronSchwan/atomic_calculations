@@ -45,17 +45,20 @@ class TransformData():
         #Geting data
         data = lor.dumpFile(file_path).atoms
         data = data[pca_class.pca_columns]
-        print(data)
-        pca = pca_class.pca
 
         #transforming data
-        self.transform = self.transform_data(data,pca,normalize_in)
-        print(self.transform)
-    def transform_data(self,data,pca,normalize):
+        self.transform = self.transform_data(data,pca_class.pca,normalize_in,pca_class.pca_components)
+    def transform_data(self,data,pca,normalize,pca_components):
         if normalize == True:
             data = pd.DataFrame(preprocessing.scale(data),columns = data.columns)#normalize data
-        pca_data = pca.transform(data)
 
+        pca_data_array = pca.transform(data)
+
+        titles = []
+        for i in range(1,pca_components+1):
+            titles.append(f"PC{i}")
+
+        pca_data = pd.DataFrame(data=pca_data_array,  columns=titles)
         return pca_data
 
 
@@ -92,7 +95,6 @@ class FittingPCA():
 
         #importing data
         data = self.import_data(files_in,self.pca_columns,removed_values_in,filtered_values_in)
-        print(data)
         #saving conditions
         self.file_names = sorted(file_names)
         self.normalize = normalize_in
@@ -121,26 +123,22 @@ class FittingPCA():
 
         for ind,file in enumerate(files):
             gc.collect()#clear what it can
-            print(f"Retriving:{file}   File:{ind+1}/{len(files)}")#System out message
 
             if ind == 0:
                 #Setting base dataframe
-                data = lor.dumpFile(file_path).atoms
+                data = lor.dumpFile(file).atoms
             else:
                 #appending to base dataframe
-                data_grab = lor.dumpFile(file_path).atoms
+                data_grab = lor.dumpFile(file).atoms
                 data.append(data_grab)
 
         #cleaning dataframe
         if filtered_values != {}:
-            print("Filtering Specified Data")
-            data = filtering_data(data,filtered_values)
+            data = bf.filtering_data(data,filtered_values)
 
         if removed_values != {}:
-            print("Removing Specified Data")
-            data = removing_data(data,removed_values)
+            data = bf.removing_data(data,removed_values)
 
-        print("Dropping Non-PCA Columns")
         data = data[pca_columns]
 
         return data

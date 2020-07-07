@@ -71,6 +71,10 @@ def class_to_bianary(function_class,file_path):
     with open(file_path, 'wb') as output:
         pickle.dump(function_class, output, pickle.HIGHEST_PROTOCOL)
 
+def bianary_to_class(file_path):
+    with open(file_path, 'rb') as input:
+        data = pickle.load(input)
+    return data
 
 def dump_class_to_lammps(dump_class,file_path):
 
