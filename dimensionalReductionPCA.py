@@ -131,7 +131,7 @@ class FittingPCA():
             else:
                 #appending to base dataframe
                 data_grab = lor.dumpFile(file).atoms
-                data.append(data_grab)
+                data = data.append(data_grab)
 
         #cleaning dataframe
         if filtered_values != {}:
