@@ -130,3 +130,24 @@ def filtering_data(data,filtered_values:dict):
 
         data = data[(data[col] <= high) & (data[col] >= low)]
     return data
+
+
+def class_to_bianary(function_class,file_path):
+    """
+    This takes a class and the filepath and saves a bianary file with pickle
+
+    class_to_bianary(function_class,file_path)
+
+    """
+    with open(file_path, 'wb') as output:
+        pickle.dump(function_class, output, pickle.HIGHEST_PROTOCOL)
+
+def bianary_to_class(file_path):
+    """
+    This reads a bianary file that has been pickled and converts it to a class
+
+    bianary_to_class(file_path)
+    """
+    with open(file_path, 'rb') as input:
+        data = pickle.load(input)
+    return data

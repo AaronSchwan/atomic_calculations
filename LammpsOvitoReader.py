@@ -1,56 +1,6 @@
 """
 This is a set of useful features for reading a writing
-basic lammps dump/file files
-
-This will read a file path that is either a pickle file or a lammps dump
-file
-
-obj = dumpFile(file_path)
-
-valid calls:
-obj.timestep = returns timestep in the file
-obj.numberofatoms = numbers of atoms in the dump
-obj.boxbounds = returns the bounds with type,low,high in a pandas datframe
-obj.atoms = atomic data
-###############################################################################
-
-This will read a file either from a path to a lammps out files from fix in
-format of standard or pickle
-
-file format:# Fix*********
-            # column ids....
-            columnized data
-
-obj = file(file_path)
-
-valid calls:
-obj.data
-
-###############################################################################
-
-This takes a class and the filepath and saves a bianary file with pickle
-
-class_to_bianary(function_class,file_path)
-
-###############################################################################
-
-This reads a bianary file that has been pickled and converts it to a class
-
-bianary_to_class(file_path)
-
-###############################################################################
-
-This will write a class from dumpFile() class and convert it from a class
-to a ovito/lammps readable file this is good for appending columns to a
-the obj.atoms data
-
-dump_class_to_lammps(dump_class,file_path)
-###############################################################################
-
-
-This writes a file() class to a file path
-
-file_class_to_lammps(data_class,file_path)
+some basic lammps output files
 
 ###############################################################################
 ###############################################################################
@@ -162,25 +112,7 @@ class file():
 
 #END OF CLASS DEFINITIONS#######################################################
 
-def class_to_bianary(function_class,file_path):
-    """
-    This takes a class and the filepath and saves a bianary file with pickle
 
-    class_to_bianary(function_class,file_path)
-
-    """
-    with open(file_path, 'wb') as output:
-        pickle.dump(function_class, output, pickle.HIGHEST_PROTOCOL)
-
-def bianary_to_class(file_path):
-    """
-    This reads a bianary file that has been pickled and converts it to a class
-
-    bianary_to_class(file_path)
-    """
-    with open(file_path, 'rb') as input:
-        data = pickle.load(input)
-    return data
 
 def dump_class_to_lammps(dump_class,file_path):
     """
@@ -217,3 +149,40 @@ def file_class_to_lammps(data_class,file_path):
     with open(file_path,'w') as file:
         file.write("# \n# ")
     data_class.data.to_csv(file_path, index = False,mode="a",sep = ' ')
+
+
+
+def import_dumps_combined(files:list,removed_values:dict,filtered_values:dict):
+    """
+    this will import many lammps singular file dumps combing all of them into
+    one pandas dataframe this is good for times that data is being trained on
+
+    import_dumps_combined(files:list,removed_values:dict,filtered_values:dict)
+
+    files = list of file names
+    removed_values = Formatted Dictionary {"Column":[Value1,Value2,...]}
+    filtered_values = Fromatted Dictionary {"Column":[low_value,high_value]}
+    """
+
+    for ind,file in enumerate(files):
+        gc.collect()#clear what it can
+
+        if ind == 0:
+            #Setting base dataframe
+            data = dumpFile(file).atoms
+
+        else:
+            #appending to base dataframe
+            data_grab = dumpFile(file).atoms
+            data = data.append(data_grab)
+
+    #cleaning dataframe
+    if filtered_values != {}:
+        data = bf.filtering_data(data,filtered_values)
+
+    if removed_values != {}:
+        data = bf.removing_data(data,removed_values)
+
+    data = data[pca_columns]
+
+    return data
