@@ -26,6 +26,11 @@ import time
 #non-default imports
 import pandas as pd
 
+
+#custom imports
+import basicFunctions as bf
+
+
 class dumpFile():
     """
     This will read a file path that is either a pickle file or a lammps dump
