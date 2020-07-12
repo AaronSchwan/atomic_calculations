@@ -188,6 +188,4 @@ def import_dumps_combined(files:list,removed_values:dict,filtered_values:dict):
     if removed_values != {}:
         data = bf.removing_data(data,removed_values)
 
-    data = data[pca_columns]
-
     return data
