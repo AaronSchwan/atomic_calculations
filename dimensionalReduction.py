@@ -44,7 +44,7 @@ class FittingPCA():
     #####################################################################
     fitting pca valid calls:
 
-    p = FittingPCA(pca_components,normalize,pca_columns,files,removed_values,filtered_values)
+    p = FittingPCA(pca_components:int,normalize:bool,data:pd.DataFrame,serial:int=None,note:list=None)
 
     p.pca #returns the trained pca
     p.normalize #returns if the pca used normalized data
@@ -85,7 +85,7 @@ class TransformPCA():
 
     #####################################################################
     transform valid calls:
-    t = TransformData(data,pca_class,normalize)
+    t = TransformData(data:pd.DataFrame,pca_class:FittingPCA,normalize:bool,serial:int=None,note:list=None)
 
     t.transform = returns the transform of the class
     t.normalize = returns if the transform was normalized before
@@ -95,7 +95,7 @@ class TransformPCA():
     t.note = returns note on the transform class saved in a list, default val = None
     """
 
-    def __init__(self,data:pd.DataFrame,pca_class:FittingPCA,normalize:bool,serial:int=None,note:list=None)->pd.DataFrame:
+    def __init__(self,data:pd.DataFrame,pca_class:FittingPCA,normalize:bool,serial:int=None,note:list=None):
         #pca class conditions
         self.pca_serial = pca_class.serial
         self.pca_note = pca_class.note
@@ -114,15 +114,13 @@ class TransformPCA():
 
         if sorted(data_columns) == sorted(pca_columns):
             data_to_transform = data[pca_columns]#make the order the same as the pca class
-            [pca_data_array,titles] = self.transform_data(data_to_transform,pca_class.pca,normalize,pca_class.pca_components)
+            self.transform = self.transform_data(data_to_transform,pca_class.pca,normalize,pca_class.pca_components)
             del data_to_transform,data_columns,pca_columns
 
         else:
-            pca_data_array = None
-            titles = None
+
             raise ValueError('The columns of the data passed do not contain the same elements the FittingPCA() class was trained on')
 
-        self.transform = pd.DataFrame(data=pca_data_array,  columns=titles)
 
     def transform_data(self,data,pca,normalize,pca_components):
         if normalize == True:
@@ -134,4 +132,6 @@ class TransformPCA():
         for i in range(1,pca_components+1):
             titles.append(f"PC{i}")
 
-        return pca_data_array,titles
+        pca_data = pd.DataFrame(data=pca_data_array,  columns=titles)
+
+        return pca_data
