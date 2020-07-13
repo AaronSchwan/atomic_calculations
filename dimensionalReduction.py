@@ -64,7 +64,7 @@ class FittingPCA():
         self.serial = serial
         self.note = note
         #calculating pca
-        self.pca =  self.computing_PCA(pca_components_in,data,normalize_in)
+        self.pca =  self.computing_PCA(pca_components,data,normalize)
 
         del data
 
@@ -106,9 +106,6 @@ class TransformPCA():
         self.note = note
         self.normalize = normalize
 
-        #Geting transform
-        data = lor.dumpFile(file_path).atoms
-        data = data[pca_class.pca_columns]
 
         #transforming data
         #checking for correct columns
@@ -117,12 +114,15 @@ class TransformPCA():
 
         if sorted(data_columns) == sorted(pca_columns):
             data_to_transform = data[pca_columns]#make the order the same as the pca class
-            self.transform = self.transform_data(data_to_transform,pca_class.pca,normalize,pca_class.pca_components)
+            [pca_data_array,titles] = self.transform_data(data_to_transform,pca_class.pca,normalize,pca_class.pca_components)
             del data_to_transform,data_columns,pca_columns
 
         else:
+            pca_data_array = None
+            titles = None
             raise ValueError('The columns of the data passed do not contain the same elements the FittingPCA() class was trained on')
 
+        self.transform = pd.DataFrame(data=pca_data_array,  columns=titles)
 
     def transform_data(self,data,pca,normalize,pca_components):
         if normalize == True:
@@ -134,5 +134,4 @@ class TransformPCA():
         for i in range(1,pca_components+1):
             titles.append(f"PC{i}")
 
-        pca_data = pd.DataFrame(data=pca_data_array,  columns=titles)
-        return pca_data
+        return pca_data_array,titles

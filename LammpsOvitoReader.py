@@ -180,7 +180,7 @@ def import_dumps_combined(files:list,removed_values:dict,filtered_values:dict):
             #appending to base dataframe
             data_grab = dumpFile(file).atoms
             data = data.append(data_grab)
-
+    print(data.head)
     #cleaning dataframe
     if filtered_values != {}:
         data = bf.filtering_data(data,filtered_values)
