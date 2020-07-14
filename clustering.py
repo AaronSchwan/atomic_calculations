@@ -28,7 +28,12 @@ import ntpath
 from sklearn import *
 import numpy as np
 import pandas as pd
-
+from scipy.spatial.distance import cdist
+from sklearn.cluster import KMeans
+from sklearn.mixture import GaussianMixture as GMM
+from sklearn.mixture import *
+################################################################################
+#KMEAN Clustering
 
 def kmean(data:pd.DataFrame,number_of_clusters:int):
     """
@@ -82,3 +87,41 @@ def kmean_fit_prediction(identification_numbering:pd.DataFrame,kmeans_data:pd.Da
     predictions = predictions.rename({0: "labels"}, axis='columns')
     labels = pd.concat([identification_numbering, predictions], axis=1, sort=False)
     return labels
+
+################################################################################
+#GMM (Gaussian Mixture Model) Clustering
+def GMM_get_num_clusters(data:pd.DataFrame,max_num:int = 10):
+    n_estimators = np.arange(2,max_num)
+    clfs = [GMM(n_components=n).fit(data) for n in n_estimators]
+    bics = [clf.bic(data) for clf in clfs]
+    aics = [clf.aic(data) for clf in clfs]
+
+    n_components = round((bics.index(min(bics)) + aics.index(min(aics)))/2)
+
+    return n_components
+
+def GMM_fit_prediction(data:pd.DataFrame,num_components:int = None):
+    if num_components == None:
+        num_components = GMM_get_num_clusters(data)
+
+    gmm = GMM(n_components=num_components).fit(data)
+    predictions = pd.DataFrame(data = gmm.predict(data))
+    predictions = predictions.rename({0: "gmm_prediction"}, axis='columns')
+    return predictions
+
+def GMM_fit(data:pd.DataFrame,num_components:int=None):
+    if num_components == None:
+        num_components = GMM_get_num_clusters(data)
+
+    gmm = GMM(n_components=num_components).fit(data)
+    return gmm
+
+def GMM_prediction(data:pd.DataFrame,gmm):
+    predictions = pd.DataFrame(data = gmm.predict(data))
+    predictions = predictions.rename({0: "gmm_prediction"}, axis='columns')
+    return predictions
+################################################################################
+#DBSCAN (Density-Based Spatial Clustering)
+
+################################################################################
+#FINCH (First Integer Neighbor Clustering)
