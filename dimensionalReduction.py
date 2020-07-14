@@ -29,6 +29,9 @@ from sklearn.preprocessing import StandardScaler
 from sklearn import preprocessing
 import pandas as pd
 from sklearn.pipeline import Pipeline
+from factor_analyzer.factor_analyzer import calculate_bartlett_sphericity
+from factor_analyzer.factor_analyzer import calculate_kmo
+from factor_analyzer import FactorAnalyzer
 
 #custom imports
 import basicFunctions as bf
@@ -135,3 +138,62 @@ class TransformPCA():
         pca_data = pd.DataFrame(data=pca_data_array,  columns=titles)
 
         return pca_data
+
+def bartlett_test(data):
+    """
+    sphericity checks whether or not the observed variables intercorrelate
+
+    if this is found to be statistically insignificant factor analysis should not
+    be used
+    """
+
+    chi_square_value,p_value=calculate_bartlett_sphericity(data)
+    return chi_square_value,p_value
+
+def kaiser_meyer_olkin_test(data):
+    """
+    measures the suitability for Factor analysis
+
+    values less than .6 are considered inadequete range 0-1
+    """
+    kmo_all,kmo_model=calculate_kmo(data)
+    return kmo_all,kmo_model
+
+def skree_data_factor_analysis(data,factor_num, rotation_val=None):
+    """
+    this allows for a skree plot of the data relating to factor analysis to be made
+    the number of values greator than 1 should be the number of factors
+    """
+    fa = FactorAnalyzer()
+    fa.set_params(n_factors=factor_num, rotation=rotation_val)
+    fa.fit(data)
+    # Check Eigenvalues
+    ev, v = fa.get_eigenvalues()
+    return ev
+
+
+
+def factor_analysis(data:pd.DataFrame,rotation_val:str,factor_num:int = 0,adequacy_tests:bool=True):
+    #checks and warnings
+    if adequacy_tests == True:
+        chi_square_value,p_value =calculate_bartlett_sphericity(data)
+        kmo_all,kmo_model=calculate_kmo(data)
+
+        if p_value > .05:
+            warnings.warn(f"The p_value by the bartlett test is {p_value}. Factor analysis is not recommended")
+        if kmo_model < .6:
+            warnings.warn(f"The kaiser meyer olklin test returns a model score of {kmo_model}. Factor analysis is not recommended")
+
+        del chi_square_value,p_value,kmo_all,kmo_model
+
+    #find facor_num if unspecified
+    if factor_num == 0:
+        ev = skree_data_factor_analysis(data, len(data.columns.tolist()))
+        factor_num = len([i for i in ev if i > 1])
+
+    #performing factor analysis
+    fa = FactorAnalyzer()
+    fa.set_params(n_factors=factor_num, rotation=rotation_val)
+    fa.fit(data)
+
+    return fa
