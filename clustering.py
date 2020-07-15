@@ -84,7 +84,7 @@ def kmean_fit_prediction(identification_numbering:pd.DataFrame,kmeans_data:pd.Da
     kmeans = KMeans(n_clusters=number_of_clusters)
     kmeans.fit(kmeans_data)
     predictions = pd.DataFrame(data = kmeans.predict(kmeans_data))
-    predictions = predictions.rename({0: "labels"}, axis='columns')
+    predictions = predictions.rename({0: "kmean_prediction"}, axis='columns')
     labels = pd.concat([identification_numbering, predictions], axis=1, sort=False)
     return labels
 
@@ -122,6 +122,12 @@ def GMM_prediction(data:pd.DataFrame,gmm):
     return predictions
 ################################################################################
 #DBSCAN (Density-Based Spatial Clustering)
+from sklearn.cluster import DBSCAN
+
+def DBSCAN_fit_prediction(data):
+    db_default = DBSCAN(eps = 0.0375, min_samples = 3).fit(data)
+    labels = db_default.labels_
+
 
 ################################################################################
 #FINCH (First Integer Neighbor Clustering)
