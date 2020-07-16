@@ -63,7 +63,7 @@ def kmean_prediction(data:pd.DataFrame,kmeans)->pd.DataFrame:
 
     returns a pandas dataframe with the label "kmean_prediction"
     """
-    predictions = pd.DataFrame(data = kmeans.predict(k_data))
+    predictions = pd.DataFrame(data = kmeans.predict(data))
     predictions = predictions.rename({0: "kmean_prediction"}, axis='columns')
     return predictions
 
