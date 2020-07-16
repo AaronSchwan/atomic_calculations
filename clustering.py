@@ -91,13 +91,14 @@ def kmean_fit_prediction(identification_numbering:pd.DataFrame,kmeans_data:pd.Da
 ################################################################################
 #GMM (Gaussian Mixture Model) Clustering
 def GMM_get_num_clusters(data:pd.DataFrame,max_num:int = 10):
+    print("GMM clusters not defined fitting")
     n_estimators = np.arange(2,max_num)
     clfs = [GMM(n_components=n).fit(data) for n in n_estimators]
     bics = [clf.bic(data) for clf in clfs]
     aics = [clf.aic(data) for clf in clfs]
 
     n_components = round((bics.index(min(bics)) + aics.index(min(aics)))/2)
-
+    print(f"number of components:{n_components}")
     return n_components
 
 def GMM_fit_prediction(data:pd.DataFrame,num_components:int = None):
