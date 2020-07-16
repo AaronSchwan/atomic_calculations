@@ -90,9 +90,9 @@ def kmean_fit_prediction(identification_numbering:pd.DataFrame,kmeans_data:pd.Da
 
 ################################################################################
 #GMM (Gaussian Mixture Model) Clustering
-def GMM_get_num_clusters(data:pd.DataFrame,max_num:int = 10):
+def GMM_get_num_clusters(data:pd.DataFrame,min_num:int=2,max_num:int = 10):
     print("GMM clusters not defined fitting")
-    n_estimators = np.arange(2,max_num)
+    n_estimators = np.arange(min_num,max_num)
     clfs = [GMM(n_components=n).fit(data) for n in n_estimators]
     bics = [clf.bic(data) for clf in clfs]
     aics = [clf.aic(data) for clf in clfs]
