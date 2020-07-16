@@ -123,11 +123,6 @@ def GMM_prediction(data:pd.DataFrame,gmm):
     return predictions
 ################################################################################
 #DBSCAN (Density-Based Spatial Clustering)
-from sklearn.cluster import DBSCAN
-
-def DBSCAN_fit_prediction(data):
-    db_default = DBSCAN(eps = 0.0375, min_samples = 3).fit(data)
-    labels = db_default.labels_
 
 
 ################################################################################
