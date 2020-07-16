@@ -35,7 +35,7 @@ from sklearn.mixture import *
 ################################################################################
 #KMEAN Clustering
 
-def kmean(data:pd.DataFrame,number_of_clusters:int):
+def kmean_fit(data:pd.DataFrame,number_of_clusters:int):
     """
     Simply uses sklearn k means package and returns a fit on the data
 
