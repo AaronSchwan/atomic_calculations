@@ -1,0 +1,4 @@
+#Importing full directory
+import atomic_calculations.basicFunctions
+import atomic_calculations.LammpsOvitoReader
+import atomic_calculations.clustering
