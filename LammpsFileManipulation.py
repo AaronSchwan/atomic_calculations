@@ -243,8 +243,3 @@ class dataFile:
         xy_xz_yz = simulation box tilt factors for triclinic system
 
 """
-
-
-test = dumpFile.lammps_dump(r"C:\Users\Aaron Schwan\Desktop\Mines REU\Data\Raw\NVT\NEGB_0_NVT\dump.NEGB_0_NVT.0")
-print(test.atoms)
-write_dump_to_data_format(test,r"C:\Users\Aaron Schwan\Desktop\testing_data_Writter.0")
