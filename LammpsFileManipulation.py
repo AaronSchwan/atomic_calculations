@@ -19,6 +19,8 @@ import gc
 import ntpath
 import pickle
 import time
+import warnings
+import concurrent.futures
 
 #non-default imports
 import pandas as pd
@@ -28,6 +30,7 @@ import pandas as pd
 #Dealing with lammps dump files#################################################
 ################################################################################
 class dumpFile:
+
     """
     This will read a file path that is either a pickle file or a lammps dump
     file
@@ -111,30 +114,95 @@ class dumpFile:
         return cls(int(raw_data.iloc[1,0]),int(raw_data.iloc[3,0]),pd.DataFrame.from_dict(box_dict).set_index("labels"),data)
 
 
-def multiple_timestep_singular_file_dumps(file_path:str):
+def multiple_timestep_singular_file_dumps(file_path:str,ids:list = ["TimestepDefault"]):
     """
     this opens a multi-timestep lammps dump and converts it to a dictionary of
     dumpFile classes with the keys set to the timesteps
+
+    ids:list = ["TimestepDefault"]
+    ids are set to the dumpclass timestep by default however if there are duplicates
+    this will override the timesteps so you can define the ids for the dictionary
     """
-    data_files = {} #dictionary of class
+    dump_files = {} #dictionary of class
 
     raw_data = pd.read_csv(file_path,header = None)#getting data
     indexes = raw_data.index[raw_data[0] == "ITEM: TIMESTEP"].tolist()#getting splitting indexes
 
-    #splitting and iterating through pandas dataFrame
-    for ind, index in enumerate(indexes):
-        if ind < len(indexes)-1:
-            #all except last index
-            df = raw_data.loc[index:indexes[ind+1]-1,:]#making new dataFrame
-            dump_class = dumpFile.raw_file_data(df)#dump class processing
-        else:
-            #last index
-            df = raw_data.loc[index:len(raw_data)+1,:]#making new dataFrame
-            dump_class = dumpFile.raw_file_data(df)#dump class processing
-        #adding to dictionary
-        data_files[int(dump_class.timestep)] = dump_class
+    if len(ids) == len(indexes) or ids == ["TimestepDefault"]:
 
-    return data_files
+        #splitting and iterating through pandas dataFrame
+        for ind, index in enumerate(indexes):
+
+            if ind < len(indexes)-1:
+                #all except last index
+                df = raw_data.loc[index:indexes[ind+1]-1,:]#making new dataFrame
+                dump_class = dumpFile.raw_file_data(df)#dump class processing
+
+            else:
+                #last index
+                df = raw_data.loc[index:len(raw_data)+1,:]#making new dataFrame
+                dump_class = dumpFile.raw_file_data(df)#dump class processing
+
+            #adding to dictionary
+            if ids == ["TimestepDefault"]:
+                #using timestep to insert
+                dump_files[int(dump_class.timestep)] = dump_class
+            else:
+                #using custom id
+                dump_files[ids[ind]] = dump_class
+
+        return dump_files
+
+
+    else:
+         warnings.warn("Length of ids list is not equal to files list length")
+
+#def batch_import_files(file_paths:list,ids:list = ["TimestepDefault"], max_simultanius_processes:int = 5):
+"""
+    batch_import_files(file_paths:list,ids:list = ["TimestepDefault"], max_simultanius_processes:int = 5):
+
+    ids:list = ["TimestepDefault"]
+    ids are set to the dumpclass timestep by default however if there are duplicates
+    this will override the timesteps so you can define the ids for the dictionary
+
+    This will import several files into a dictionary of dumpFiles
+    dict[id] = dumpFile
+
+    this is a predone way to use the concurent.futures module to import several files
+    accross several cores at once
+
+    default processes = 5
+"""
+"""
+    #adjusting ids if necessary
+    if ids == ["TimestepDefault"]:
+        ids = ["TimestepDefault" for i in range(len(file_paths))]
+
+    if len(ids) == len(file_paths):
+
+
+
+
+        def chunking(lst, n):
+            for i in range(0, len(lst), n):
+                yield lst[i:i + n]
+
+
+
+        dump_files = {}
+
+
+        #batching ids and files
+        batching_file_paths = [file_paths[i:i + max_simultanius_processes] for i in range(0, len(file_paths), max_simultanius_processes)]
+        batching_ids = [ids[i:i + max_simultanius_processes] for i in range(0, len(ids), max_simultanius_processes)]
+
+
+
+
+    else:
+         warnings.warn("Length of ids list is not equal to files list length")
+
+"""
 
 def write_lammps_dump(file_path:str,dump_class:dumpFile,mode:str = "a"):
     """
@@ -211,7 +279,6 @@ def write_dump_to_data_format(dump_class:dumpFile,file_path:str):
 
 
 
-
 ################################################################################
 #Dealing with lammps data files#################################################
 ################################################################################
@@ -223,9 +290,8 @@ class dataFile:
     def __init__(self,atoms,bonds,angles,dihedrals,dihedrals,impropers,atom_types,bond_types,angle_types,dihedral_types,improper_types,extra_bond_per_atom,ellipsoids,lines,triangles,xlo_xhi,ylo_yhi,zlo_zhi,xy_xz_yz):
 
 
-        atoms = # of atoms in system
-        bonds = # of bonds in system
-        angles = # of angles in system
+
+        ++
         dihedrals = # of dihedrals in system
         impropers = # of impropers in system
         atom_types = # of atom types in system
@@ -243,8 +309,3 @@ class dataFile:
         xy_xz_yz = simulation box tilt factors for triclinic system
 
 """
-
-
-test = dumpFile.lammps_dump(r"C:\Users\Aaron Schwan\Desktop\Mines REU\Data\Raw\NVT\NEGB_0_NVT\dump.NEGB_0_NVT.0")
-print(test.atoms)
-write_dump_to_data_format(test,r"C:\Users\Aaron Schwan\Desktop\testing_data_Writter.0")
