@@ -19,6 +19,7 @@ import gc
 import ntpath
 import pickle
 import time
+import warnings
 
 #non-default imports
 import pandas as pd
@@ -50,14 +51,70 @@ class dumpFile:
 
 
     """
+    class_tolerance = 12 #the accuarcy of the classes operational functions
+    checking_tolerance = 5 #how many decimals the classes attributes will be checked to
 
-    def __init__(self,timestep:int,numberofatoms:int,boxbounds:pd.DataFrame,atoms:pd.DataFrame,serial=None):
+    def __init__(self,timestep:int,boundingtypes:list,atoms:pd.DataFrame):
         self.timestep = timestep
-        self.numberofatoms = numberofatoms
-        self.boxbounds = boxbounds
+        self.boundingtypes = boundingtypes
         self.atoms = atoms
-        self.serial = serial
 
+    #property defined functions#################################################
+    @property
+    def numberofatoms(self):
+        #finds the number of atoms for the given data
+        return len(self.atoms["id"])
+
+    @property
+    def boxbounds(self):
+
+        #getting bounds and making custom format to values
+        box_dict = {"labels":["type","low","high"],"x":[self.boundingtypes[0],min(self.atoms["x"]),max(self.atoms["x"])],"y":[self.boundingtypes[1],min(self.atoms["y"]),max(self.atoms["y"])],"z":[self.boundingtypes[2],min(self.atoms["z"]),max(self.atoms["z"])]}
+        return pd.DataFrame.from_dict(box_dict).set_index("labels")
+
+    @property
+    def volume(self):
+        """
+        gets the volume of the overall simulation cell as a box
+        """
+        x_range = abs(self.boxbounds.loc["high","x"] - self.boxbounds.loc["low","x"])
+        y_range = abs(self.boxbounds.loc["high","y"] - self.boxbounds.loc["low","y"])
+        z_range = abs(self.boxbounds.loc["high","z"] - self.boxbounds.loc["low","z"])
+
+        return x_range*y_range*z_range
+
+    @property
+    def xy_area(self):
+        """
+        gets the area of the xy plane of the simulation cell as a box
+        """
+        x_range = abs(self.boxbounds.loc["high","x"] - self.boxbounds.loc["low","x"])
+        y_range = abs(self.boxbounds.loc["high","y"] - self.boxbounds.loc["low","y"])
+
+        return x_range*y_range
+
+    @property
+    def xz_area(self):
+        """
+        gets the area of the xy plane of the simulation cell as a box
+        """
+        x_range = abs(self.boxbounds.loc["high","x"] - self.boxbounds.loc["low","x"])
+        z_range = abs(self.boxbounds.loc["high","z"] - self.boxbounds.loc["low","z"])
+
+        return x_range*z_range
+
+    @property
+    def yz_area(self):
+        """
+        gets the area of the xy plane of the simulation cell as a box
+        """
+        z_range = abs(self.boxbounds.loc["high","z"] - self.boxbounds.loc["low","z"])
+        y_range = abs(self.boxbounds.loc["high","y"] - self.boxbounds.loc["low","y"])
+
+        return z_range*y_range
+
+
+    #Alternative CLass Constructive Methods#####################################
     @classmethod
     def lammps_dump(cls,file_path:str):
         """
@@ -73,12 +130,11 @@ class dumpFile:
 
         #getting bounds and making custom format to values
         boxboundtype =  raw_data.iloc[3,0].replace("ITEM: BOX BOUNDS ","").split(" ")
-        boxboundings = pd.DataFrame(raw_data.iloc[4:7,0].str.split(' ',1).tolist())
-        box_dict = {"labels":["type","low","high"],"x":[boxboundtype[0],boxboundings.iloc[0,0],boxboundings.iloc[0,1]],"y":[boxboundtype[1],boxboundings.iloc[1,0],boxboundings.iloc[1,1]],"z":[boxboundtype[2],boxboundings.iloc[2,0],boxboundings.iloc[2,1]]}
 
         #returning class
-        return cls(int(raw_data.iloc[0,0]),int(raw_data.iloc[2,0]),pd.DataFrame.from_dict(box_dict).set_index("labels"),data)
+        return cls(int(raw_data.iloc[0,0]),boxboundtype,data)
 
+    #IMPORTANT redefine this to work with LAMMPS Dummps bianary
     @classmethod
     def bianary_dump(cls,file_path:str):
         """
@@ -109,6 +165,41 @@ class dumpFile:
 
         #returning class
         return cls(int(raw_data.iloc[1,0]),int(raw_data.iloc[3,0]),pd.DataFrame.from_dict(box_dict).set_index("labels"),data)
+
+    #Class methods##############################################################
+    @classmethod
+    def change_checking_tolerance(cls,value):
+        cls.checking_tolerance = value
+
+    @classmethod
+    def change_class_tolerance(cls,value):
+        cls.class_tolerance = value
+
+    #dubble under functions#####################################################
+    def __repr__(self):
+        #returning the atoms by default when calling the function alone
+        return "{TimeStep:"+str(self.timestep)+"\nBoundings"+str(self.boxbounds)+"\nAtomic Data"+str(self.atoms.head)+"}"
+
+    def __eq__(self):
+        """
+        This checks if the base conditions are equal such as the number of atoms,
+        the boundary after transform to the first boundary, then if it passes
+        both of those conditions it will check the atoms positions within a given
+        tolerance(class variable name = class_tolerance)
+        """
+        pass;
+    def __add__(self,other):
+        """
+        This is an alternative merge method first the class checks the compatability
+        of the merge
+        """
+        pass;
+
+    def __sub__(self,other):
+        """
+        This is an alternative method to remove columns from the
+        """
+        pass;
 
 
 def multiple_timestep_singular_file_dumps(file_path:str):
@@ -208,7 +299,7 @@ def write_dump_to_data_format(dump_class:dumpFile,file_path:str):
 
 
 
-
+dump_class = dumpFile.lammps_dump(r"C:\Users\Aaron Schwan\Desktop\Moments.0001_dump.221.0")
 
 
 
