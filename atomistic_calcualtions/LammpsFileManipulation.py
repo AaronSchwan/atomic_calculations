@@ -21,11 +21,12 @@ import pickle
 import time
 import warnings
 import concurrent.futures
+import types
 
 
 #non-default imports
 import pandas as pd
-
+import numpy as np
 
 ################################################################################
 #Dealing with lammps dump files#################################################
@@ -46,7 +47,6 @@ class dumpFile:
     obj.serial = serial number assigned to function[unassigned]
 
     class methods:
-
     dumpFile.lammps_dump(self, file_path) ##Must be a singular timestep dumpFile
     dumpFile.bianary_dump(self, file_path) ##Must be a bianary of this class format
 
@@ -55,7 +55,7 @@ class dumpFile:
 
     """
     class_tolerance = 12 #the accuarcy of the classes operational functions
-    checking_tolerance = 5 #how many decimals the classes attributes will be checked to
+    checking_tolerance = 3 #how many decimals the classes attributes will be checked to
 
     def __init__(self,timestep:int,boundingtypes:list,atoms:pd.DataFrame):
         self.timestep = timestep
@@ -183,26 +183,153 @@ class dumpFile:
         #returning the atoms by default when calling the function alone
         return "{TimeStep:"+str(self.timestep)+"\nBoundings"+str(self.boxbounds)+"\nAtomic Data"+str(self.atoms.head)+"}"
 
-    def __eq__(self):
+    def __eq__(self,other):
         """
         This checks if the base conditions are equal such as the number of atoms,
         the boundary after transform to the first boundary, then if it passes
         both of those conditions it will check the atoms positions within a given
         tolerance(class variable name = class_tolerance)
         """
-        pass;
+
+        if self.numberofatoms == other.numberofatoms:
+            if self.boxbounds.loc[["low","high"]].astype(int).equals(other.boxbounds.loc[["low","high"]].astype(int)) and self.boxbounds.loc[["type"]].equals(other.boxbounds.loc[["type"]]):
+                df = (self.atoms[["id","x","y","z"]].round(dumpFile.checking_tolerance+1)-other.atoms[["id","x","y","z"]].round(dumpFile.checking_tolerance+1)).round(dumpFile.checking_tolerance)
+                if (df["id"]  == 0).all() and (df["x"]  == 0).all() and (df["y"]  == 0).all() and (df["z"]  == 0).all():
+                    return True
+            else:
+                return False
+
+        else:
+            return False
+
+
     def __add__(self,other):
         """
         This is an alternative merge method first the class checks the compatability
         of the merge
         """
-        pass;
+        if self == other:
+            unique_columns = np.setdiff1d(other.atoms.columns.tolist(),self.atoms.columns.tolist())
 
-    def __sub__(self,other):
+            self.atoms = self.atoms.join(other.atoms[unique_columns])
+
+        else:
+            raise Exception("You may not add two classes where the atomic conditions/placements are not equal")
+
+
+
+    #Class functional methods###################################################
+    def translate(self,quadrent):
         """
-        This is an alternative method to remove columns from the
+        This function transforms the atoms of the class to different quadrents
+        labeled below.
+
+        The predefined quadrent operations will make sure one boundry is a 0 0 0
+
+        Standards:
+         quadrent = x y z
+                1 = + + +
+                2 = + + -
+                3 = + - +
+                4 = + - -
+                5 = - + +
+                6 = - + -
+                7 = - - +
+                8 = - - -
+                9 = centered at 0 0 0
+        Custum Transform:
+         The value is added to the atoms direction from the list in order [x_shift, y_shift, z_shift]
+
         """
-        pass;
+
+        #getting correction direction for minimums
+        if min(self.atoms["x"]) > 0:
+            dir_x = -1
+        else:
+            dir_x = 1
+
+        if min(self.atoms["y"]) > 0:
+            dir_y = -1
+        else:
+            dir_y = 1
+
+        if min(self.atoms["z"]) > 0:
+            dir_z = -1
+        else:
+            dir_z = 1
+
+        #standard quadrent transforms
+        if quadrent == 1:
+            self.atoms["x"] = self.atoms["x"] - min(self.atoms["x"])
+            self.atoms["y"] = self.atoms["y"] - min(self.atoms["y"])
+            self.atoms["z"] = self.atoms["z"] - min(self.atoms["z"])
+
+        elif quadrent == 2:
+            self.atoms["x"] = self.atoms["x"] - min(self.atoms["x"])
+            self.atoms["y"] = self.atoms["y"] - min(self.atoms["y"])
+            self.atoms["z"] = self.atoms["z"] + dir_z*min(self.atoms["z"])
+            self.atoms["z"] = self.atoms["z"] - max(self.atoms["z"])
+
+        elif quadrent == 3:
+            self.atoms["x"] = self.atoms["x"] - min(self.atoms["x"])
+            self.atoms["y"] = self.atoms["y"] + dir_x*min(self.atoms["y"])
+            self.atoms["y"] = self.atoms["y"] - max(self.atoms["y"])
+            self.atoms["z"] = self.atoms["z"] - min(self.atoms["z"])
+
+        elif quadrent == 4:
+            self.atoms["x"] = self.atoms["x"] - min(self.atoms["x"])
+            self.atoms["y"] = self.atoms["y"] + dir_x*min(self.atoms["y"])
+            self.atoms["y"] = self.atoms["y"] - max(self.atoms["y"])
+            self.atoms["z"] = self.atoms["z"] + dir_x*min(self.atoms["z"])
+            self.atoms["z"] = self.atoms["z"] - max(self.atoms["z"])
+
+        elif quadrent == 5:
+            self.atoms["x"] = self.atoms["x"] + dir_x*min(self.atoms["x"])
+            self.atoms["x"] = self.atoms["x"] - max(self.atoms["x"])
+            self.atoms["y"] = self.atoms["y"] - min(self.atoms["y"])
+            self.atoms["z"] = self.atoms["z"] - min(self.atoms["z"])
+
+        elif quadrent == 6:
+            self.atoms["x"] = self.atoms["x"] + dir_x*min(self.atoms["x"])
+            self.atoms["x"] = self.atoms["x"] - max(self.atoms["x"])
+            self.atoms["y"] = self.atoms["y"] - min(self.atoms["y"])
+            self.atoms["z"] = self.atoms["z"] + dir_x*min(self.atoms["z"])
+            self.atoms["z"] = self.atoms["z"] - max(self.atoms["z"])
+
+        elif quadrent == 7:
+            self.atoms["x"] = self.atoms["x"] + dir_x*min(self.atoms["x"])
+            self.atoms["x"] = self.atoms["x"] - max(self.atoms["x"])
+            self.atoms["y"] = self.atoms["y"] + dir_x*min(self.atoms["y"])
+            self.atoms["y"] = self.atoms["y"] - max(self.atoms["y"])
+            self.atoms["z"] = self.atoms["z"] - min(self.atoms["z"])
+
+        elif quadrent == 8:
+            self.atoms["x"] = self.atoms["x"] + dir_x*min(self.atoms["x"])
+            self.atoms["x"] = self.atoms["x"] - max(self.atoms["x"])
+            self.atoms["y"] = self.atoms["y"] + dir_x*min(self.atoms["y"])
+            self.atoms["y"] = self.atoms["y"] - max(self.atoms["y"])
+            self.atoms["z"] = self.atoms["z"] + dir_x*min(self.atoms["z"])
+            self.atoms["z"] = self.atoms["z"] - max(self.atoms["z"])
+
+        elif quadrent == 9:
+            self.atoms["x"] = self.atoms["x"] - min(self.atoms["x"])
+            self.atoms["y"] = self.atoms["y"] - min(self.atoms["y"])
+            self.atoms["z"] = self.atoms["z"] - min(self.atoms["z"])
+
+            self.atoms["x"] = self.atoms["x"] - (max(self.atoms["x"])/2)
+            self.atoms["y"] = self.atoms["y"] - (max(self.atoms["y"])/2)
+            self.atoms["z"] = self.atoms["z"] - (max(self.atoms["z"])/2)
+        elif type(quadrent) == list:
+            if all(isinstance(i, (float, int)) for i in quadrent):
+                self.atoms["x"] = self.atoms["x"] + quadrent[0]
+                self.atoms["y"] = self.atoms["y"] + quadrent[1]
+                self.atoms["z"] = self.atoms["z"] + quadrent[2]
+            else:
+                 raise Exception("Not a valid input to translation function custom list")
+        else:
+             raise Exception("Not a valid input to translation function")
+
+
 
 
 def multiple_timestep_singular_file_dumps(file_path:str,ids:list = ["TimestepDefault"]):
@@ -365,10 +492,17 @@ def write_dump_to_data_format(dump_class:dumpFile,file_path:str):
     atomic_data = dump_class.atoms[["id","type", "x", "y", "z"]].to_csv(file_path,mode = "a", index = False,header = Flase ,sep = ' ')
 
 
+dump_class = dumpFile.lammps_dump(r"C:\Users\Aaron Schwan\Desktop\Moments.0001_NEGB_0_NVT.10000")
+other_dump = dumpFile.lammps_dump(r"C:\Users\Aaron Schwan\Desktop\TMIN_10e-5_NEGB_0_NVT.10000")
+dump_class.translate(1)
+other_dump.translate(1)
+print(dump_class)
+print(other_dump.atoms[["id","x","y","z"]].round(0))
 
 
-dump_class = dumpFile.lammps_dump(r"C:\Users\Aaron Schwan\Desktop\Moments.0001_dump.221.0")
+dump_class + other_dump
 
+print(dump_class.atoms)
 
 ################################################################################
 #Dealing with lammps data files#################################################
