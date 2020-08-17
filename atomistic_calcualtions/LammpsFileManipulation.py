@@ -54,8 +54,28 @@ class dumpFile:
 
 
     """
+    #precision based variables
     class_tolerance = 12 #the accuarcy of the classes operational functions
     checking_tolerance = 3 #how many decimals the classes attributes will be checked to
+
+    #coordinate system variables ["cartesian","cylindrical","spherical"]
+    auto_change_active_coordinate_system = True #when a system is changed to such as cartesian added or spherical added when set to True this will change the value of the active_coordinate_system to the new system
+    active_coordinate_system = "cartesian"#the refrenced coordinate system for mathmatical operations in this class
+    ##atomic identification
+    id = "id"
+    ##cartesian
+    x_axis_cart = "x"
+    y_axis_cart = "y"
+    z_axis_cart = "z"
+    ##cylindrical
+    r_cly = "r_cly"
+    phi_cly = "phi_cly"
+    z_axis_cly = "z_cly"
+    ##spherical
+    r_sph = "r_sph"
+    theta_sph = "theta_sph"
+    phi_sph = "phi_sph"
+    
 
     def __init__(self,timestep:int,boundingtypes:list,atoms:pd.DataFrame):
         self.timestep = timestep
@@ -211,7 +231,8 @@ class dumpFile:
         if self == other:
             unique_columns = np.setdiff1d(other.atoms.columns.tolist(),self.atoms.columns.tolist())
 
-            self.atoms = self.atoms.join(other.atoms[unique_columns])
+            atomic_data = self.atoms.join(other.atoms[unique_columns])#merged atoms
+            return dumpFile(self.timestep,self.boundingtypes,atomic_data)
 
         else:
             raise Exception("You may not add two classes where the atomic conditions/placements are not equal")
@@ -219,7 +240,7 @@ class dumpFile:
 
 
     #Class functional methods###################################################
-    def translate(self,quadrent):
+    def translate(self,translate,coordinate_sys = self.active_coordinate_system):
         """
         This function transforms the atoms of the class to different quadrents
         labeled below.
@@ -492,18 +513,18 @@ def write_dump_to_data_format(dump_class:dumpFile,file_path:str):
     atomic_data = dump_class.atoms[["id","type", "x", "y", "z"]].to_csv(file_path,mode = "a", index = False,header = Flase ,sep = ' ')
 
 
-dump_class = dumpFile.lammps_dump(r"C:\Users\Aaron Schwan\Desktop\Moments.0001_NEGB_0_NVT.0")
-other_dump = dumpFile.lammps_dump(r"C:\Users\Aaron Schwan\Desktop\TMin_0.0001_NEGB_0_NVT.0")
+dump_class = dumpFile.lammps_dump(r"D:\Mines REU\Data\ThermalMinimization\Thermal_Min_Files\TMin 10e-5 NVT\NEGB 0\TMin_0.0001_NEGB_0_NVT.0")
+other_dump = dumpFile.lammps_dump(r"D:\Mines REU\Data\NVT_calcs_temp\Base\Moments.0001_NEGB_0_NVT.0")
 
 dump_class.translate(1)
 other_dump.translate(1)
+
+merged = dump_class + other_dump
+
 print(dump_class)
 print(other_dump)
 
-
-dump_class + other_dump
-
-print(dump_class.atoms)
+print(merged)
 
 ################################################################################
 #Dealing with lammps data files#################################################
