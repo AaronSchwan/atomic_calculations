@@ -33,6 +33,8 @@ import numpy as np
 ################################################################################
 class dumpFile:
 
+    #Important: Update docstrings
+
     """
     This will read a file path that is either a pickle file or a lammps dump
     file
@@ -75,7 +77,7 @@ class dumpFile:
     r_sph = "r_sph"
     theta_sph = "theta_sph"
     phi_sph = "phi_sph"
-    
+
 
     def __init__(self,timestep:int,boundingtypes:list,atoms:pd.DataFrame):
         self.timestep = timestep
