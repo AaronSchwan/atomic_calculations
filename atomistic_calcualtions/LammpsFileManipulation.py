@@ -492,12 +492,13 @@ def write_dump_to_data_format(dump_class:dumpFile,file_path:str):
     atomic_data = dump_class.atoms[["id","type", "x", "y", "z"]].to_csv(file_path,mode = "a", index = False,header = Flase ,sep = ' ')
 
 
-dump_class = dumpFile.lammps_dump(r"C:\Users\Aaron Schwan\Desktop\Moments.0001_NEGB_0_NVT.10000")
-other_dump = dumpFile.lammps_dump(r"C:\Users\Aaron Schwan\Desktop\TMIN_10e-5_NEGB_0_NVT.10000")
+dump_class = dumpFile.lammps_dump(r"C:\Users\Aaron Schwan\Desktop\Moments.0001_NEGB_0_NVT.0")
+other_dump = dumpFile.lammps_dump(r"C:\Users\Aaron Schwan\Desktop\TMin_0.0001_NEGB_0_NVT.0")
+
 dump_class.translate(1)
 other_dump.translate(1)
 print(dump_class)
-print(other_dump.atoms[["id","x","y","z"]].round(0))
+print(other_dump)
 
 
 dump_class + other_dump
