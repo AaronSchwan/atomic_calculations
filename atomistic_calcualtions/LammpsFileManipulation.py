@@ -22,7 +22,7 @@ import time
 import warnings
 import concurrent.futures
 import types
-
+import copy
 
 #non-default imports
 import pandas as pd
@@ -31,52 +31,52 @@ import numpy as np
 ################################################################################
 #Dealing with lammps dump files#################################################
 ################################################################################
+
 class dumpFile:
 
-    #IMPORTANT: Update docstrings
-
     """
-    This will read a file path that is either a pickle file or a lammps dump
-    file
+    This is a class optimized for operations on dump files exported from lammps
+    programs
 
     obj = dumpFile(timestep:int,numberofatoms:int,boxbounds:pd.DataFrame,atoms:pd.DataFrame,serial=None)
 
-    valid calls:
-    obj.timestep = returns timestep in the file[int]
-    obj.numberofatoms = numbers of atoms in the dump[int]
-    obj.boxbounds = returns the bounds with type,low,high in a pandas datframe[pd.DataFrame]
-    obj.atoms = atomic data[pd.DataFrame]
-    obj.serial = serial number assigned to function[unassigned]
+    Alternative class construction methods(file_path = path to file):
+        dumpFile.lammps_dump(cls, file_path) #reads in a standard lammps dump
+        dumpFile.pandas_to_dumpfile(cls, file_path) #reads in lammps data from pandas dataframe to new class
 
-    class methods:
-    dumpFile.lammps_dump(self, file_path) ##Must be a singular timestep dumpFile
-    dumpFile.bianary_dump(self, file_path) ##Must be a bianary of this class format
+    valid property calls:
+        obj.timestep = returns timestep in the file[int]
+        obj.numberofatoms = numbers of atoms in the dump[int]
+        obj.atoms = atomic data[pd.DataFrame]
+        obj.boxbounds = returns the bounds with type,low,high in a pandas datframe[pd.DataFrame]
+        obj.volume = returns cubic shaped volume
+        obj.xy_area = returns square shaped area of xy plane
+        obj.xz_area = returns square shaped area of xz plane
+        obj.yz_area = returns square shaped area of yz plane
 
-    file_path = path to file
+    method calls:
+        obj.translate() = method to translate atom locations of the instance this
+                            will return a new instance of the class in order to
+                            preserve data integrety for the class instance
 
+    dunder calls:
+        "obj1 == obj2" = returns if the atomic positional distances are identical
+                            uses the class variable checking_tolerance for amount
+                            of precission in check
 
+        "merge_obj = obj1+obj2" = alternative way to merge data of the obj.atoms
     """
+
     #precision based variables
     class_tolerance = 12 #the accuarcy of the classes operational functions
     checking_tolerance = 3 #how many decimals the classes attributes will be checked to
 
-    #coordinate system variables ["cartesian","cylindrical","spherical"]
-    auto_change_active_coordinate_system = True #when a system is changed to such as cartesian added or spherical added when set to True this will change the value of the active_coordinate_system to the new system
-    active_coordinate_system = "cartesian"#the refrenced coordinate system for mathmatical operations in this class
     ##atomic identification
     id = "id"
     ##cartesian
     x_axis_cart = "x"
     y_axis_cart = "y"
     z_axis_cart = "z"
-    ##cylindrical
-    r_cly = "r_cly"
-    phi_cly = "phi_cly"
-    z_axis_cly = "z_cly"
-    ##spherical
-    r_sph = "r_sph"
-    theta_sph = "theta_sph"
-    phi_sph = "phi_sph"
 
 
     def __init__(self,timestep:int,boundingtypes:list,atoms:pd.DataFrame):
@@ -147,49 +147,52 @@ class dumpFile:
 
         will create the class of dumpFile once processed
         """
-        raw_data = pd.read_csv(file_path)#getting data
+        raw_data = pd.read_csv(file_path,header = None)#getting data
+        indexes = raw_data.index[raw_data[0].str.contains("ITEM: TIMESTEP")].tolist()#allowing check for singular
 
-        titles = raw_data.iloc[7].str.split(expand = True).iloc[0][2:].tolist()#getting titles of atomic data
-        data = pd.DataFrame(raw_data.iloc[8:,0].str.split(' ',len(titles)-1).tolist(), columns = titles)#getting atomic data
-        data =  data.apply(pd.to_numeric)
+        if len(indexes) == 1:
+            titles = raw_data.iloc[8].str.split(expand = True).iloc[0][2:].tolist()#getting titles of atomic data
+            data = pd.DataFrame(raw_data.iloc[9:,0].str.split(' ',len(titles)-1).tolist(), columns = titles)#getting atomic data
+            data =  data.apply(pd.to_numeric)
 
-        #getting bounds and making custom format to values
-        boxboundtype =  raw_data.iloc[3,0].replace("ITEM: BOX BOUNDS ","").split(" ")
+            #getting bounds and making custom format to values
+            boxboundtype =  raw_data.iloc[4,0].replace("ITEM: BOX BOUNDS ","").split(" ")
 
-        #returning class
-        return cls(int(raw_data.iloc[0,0]),boxboundtype,data)
+            #returning class
+            return cls(int(raw_data.iloc[1,0]),boxboundtype,data)
 
-    #IMPORTANT redefine this to work with LAMMPS Dummps bianary
-    @classmethod
-    def bianary_dump(cls,file_path:str):
-        """
-        creates class from a bianary dumpFile class
-        """
-        #opening class saved as bianary
-        with open(file_path, 'rb') as input:
-            data = pickle.load(input)
-        #returning class
-        return cls(data.timestep,data.numberofatoms,data.boxbounds,data.atoms)
+        elif len(indexes) > 1:
+            raise Exception("FILE IMPORT ERROR: You may not import a multiple timestep file using this method please use the multiple_timestep_singular_file_dumps function")
+
+        else:
+            raise Exception("FILE IMPORT ERROR: check file formatting ")
 
     @classmethod
-    def raw_file_data(cls,raw_data:pd.DataFrame):
+    def pandas_to_dumpfile(cls,raw_data:pd.DataFrame):
         """
         takes in a lammps dump file in the form of a singular column singular time step
 
-        **Must include all data from first row "TimeStep:" to last
+        **Must include all data from first row "ITEM: TIMESTEP" to last row in one column
         """
 
-        titles = raw_data.iloc[8].str.split(expand = True).iloc[0][2:].tolist()#getting titles of atomic data
-        data = pd.DataFrame(raw_data.iloc[9:,0].str.split(' ',len(titles)-1).tolist(), columns = titles)#getting atomic data
-        data =  data.apply(pd.to_numeric)
+        indexes = raw_data.index[raw_data[0].str.contains("ITEM: TIMESTEP")].tolist()#allowing check for singular
 
-        #getting bounds and making custom format to values
-        boxboundtype =  raw_data.iloc[4,0].replace("ITEM: BOX BOUNDS ","").split(" ")
-        boxboundings = pd.DataFrame(raw_data.iloc[5:8,0].str.split(' ',1).tolist())
-        box_dict = {"labels":["type","low","high"],"x":[boxboundtype[0],boxboundings.iloc[0,0],boxboundings.iloc[0,1]],"y":[boxboundtype[1],boxboundings.iloc[1,0],boxboundings.iloc[1,1]],"z":[boxboundtype[2],boxboundings.iloc[2,0],boxboundings.iloc[2,1]]}
+        if len(indexes) == 1:
+            titles = raw_data.iloc[8].str.split(expand = True).iloc[0][2:].tolist()#getting titles of atomic data
+            data = pd.DataFrame(raw_data.iloc[9:,0].str.split(' ',len(titles)-1).tolist(), columns = titles)#getting atomic data
+            data =  data.apply(pd.to_numeric)
 
-        #returning class
-        return cls(int(raw_data.iloc[1,0]),int(raw_data.iloc[3,0]),pd.DataFrame.from_dict(box_dict).set_index("labels"),data)
+            #getting bounds and making custom format to values
+            boxboundtype =  raw_data.iloc[4,0].replace("ITEM: BOX BOUNDS ","").split(" ")
+
+            #returning class
+            return cls(int(raw_data.iloc[1,0]),boxboundtype,data)
+
+        elif len(indexes) > 1:
+            raise Exception("FILE IMPORT ERROR: You may not import a multiple timestep file using this method please use the multiple_timestep_singular_file_dumps function")
+
+        else:
+            raise Exception("FILE IMPORT ERROR: check file formatting ")
 
     #Class methods##############################################################
     @classmethod
@@ -199,6 +202,7 @@ class dumpFile:
     @classmethod
     def change_class_tolerance(cls,value):
         cls.class_tolerance = value
+
 
     #dubble under functions#####################################################
     def __repr__(self):
@@ -211,24 +215,40 @@ class dumpFile:
         the boundary after transform to the first boundary, then if it passes
         both of those conditions it will check the atoms positions within a given
         tolerance(class variable name = class_tolerance)
-        """
 
-        if self.numberofatoms == other.numberofatoms:
-            if self.boxbounds.loc[["low","high"]].astype(int).equals(other.boxbounds.loc[["low","high"]].astype(int)) and self.boxbounds.loc[["type"]].equals(other.boxbounds.loc[["type"]]):
-                df = (self.atoms[["id","x","y","z"]].round(dumpFile.checking_tolerance+1)-other.atoms[["id","x","y","z"]].round(dumpFile.checking_tolerance+1)).round(dumpFile.checking_tolerance)
-                if (df["id"]  == 0).all() and (df["x"]  == 0).all() and (df["y"]  == 0).all() and (df["z"]  == 0).all():
+        This will auto transform both dumpFile class instances to the positive
+        quadrent system in order to avoid issues involving one transformed and
+        one non transformed
+
+        The comparison will be done using the leftmost class instances
+        active coordinate system
+
+        checks in order: number of atoms -> atomic positions
+        """
+        if dumpFile.active_coordinate_system == "cartesian":
+
+            if self.numberofatoms == other.numberofatoms:
+                #subtraction method because pd.equals will return false unless more operations are done
+                df_self = self.translate(1).atoms[[self.id,self.x_axis_cart,self.y_axis_cart,self.z_axis_cart]]
+                df_other = other.translate(1).atoms[[self.id,self.x_axis_cart,self.y_axis_cart,self.z_axis_cart]]
+                df = (df_self-df_other).round(dumpFile.checking_tolerance)
+                if df[self.id].eq(0).all() and df[self.x_axis_cart].eq(0).all()and df[self.y_axis_cart].eq(0).all() and df[self.z_axis_cart].eq(0).all():
                     return True
+                else:
+                    return False
+
             else:
                 return False
-
-        else:
-            return False
 
 
     def __add__(self,other):
         """
         This is an alternative merge method first the class checks the compatability
         of the merge
+
+        This acts be leaving the columns in the leftmost class instance untouched
+        and appends the unique data to the leftmost class instance returning a new
+        instance
         """
         if self == other:
             unique_columns = np.setdiff1d(other.atoms.columns.tolist(),self.atoms.columns.tolist())
@@ -239,14 +259,15 @@ class dumpFile:
         else:
             raise Exception("You may not add two classes where the atomic conditions/placements are not equal")
 
-
-
     #Class functional methods###################################################
     def translate(self,translation_operation,coordinate_sys = "active"):
 
         """
         This function transforms the atoms of the class to different quadrents
         labeled below.
+
+        proper call:
+        translated = class_instance.translate(translation_operation)
 
         The predefined quadrent operations will make sure one boundry is a 0 0 0
 
@@ -267,128 +288,128 @@ class dumpFile:
 
         """
 
-        #update the coordinate system if needed
-        if coordinate_sys == "active":
-            coordinate_sys = self.active_coordinate_system
 
-        #defining new pandas dataframe to return class instance
-        atomic_data = self.atoms
+        #defining new object
+        dump_class_object = copy.deepcopy(self)
 
-        if coordinate_sys == "cartesian":
-            #getting correction direction for minimums
-            if min(atomic_data["x"]) > 0:
-                dir_x = -1
+
+        id = self.id
+        x = self.x_axis_cart
+        y = self.y_axis_cart
+        z = self.z_axis_cart
+        #getting correction direction for minimums
+        if min(dump_class_object.atoms[x]) > 0:
+            dir_x = -1
+        else:
+            dir_x = 1
+
+        if min(dump_class_object.atoms[y]) > 0:
+            dir_y = -1
+        else:
+            dir_y = 1
+
+        if min(dump_class_object.atoms[z]) > 0:
+            dir_z = -1
+        else:
+            dir_z = 1
+
+        #standard translation_operationtransforms
+        if translation_operation == 1:
+
+            dump_class_object.atoms[x] = dump_class_object.atoms[x] - min(dump_class_object.atoms[x])
+            dump_class_object.atoms[y] = dump_class_object.atoms[y] - min(dump_class_object.atoms[y])
+            dump_class_object.atoms[z] = dump_class_object.atoms[z] - min(dump_class_object.atoms[z])
+
+            return dump_class_object
+
+        elif translation_operation == 2:
+            dump_class_object.atoms[x] = dump_class_object.atoms[x] - min(dump_class_object.atoms[x])
+            dump_class_object.atoms[y] = dump_class_object.atoms[y] - min(dump_class_object.atoms[y])
+            dump_class_object.atoms[z] = dump_class_object.atoms[z] + dir_z*min(dump_class_object.atoms[z])
+            dump_class_object.atoms[z] = dump_class_object.atoms[z] - max(dump_class_object.atoms[z])
+
+            return dump_class_object
+
+        elif translation_operation == 3:
+            dump_class_object.atoms[x] = dump_class_object.atoms[x] - min(dump_class_object.atoms[x])
+            dump_class_object.atoms[y] = dump_class_object.atoms[y] + dir_x*min(dump_class_object.atoms[y])
+            dump_class_object.atoms[y] = dump_class_object.atoms[y] - max(dump_class_object.atoms[y])
+            dump_class_object.atoms[z] = dump_class_object.atoms[z] - min(dump_class_object.atoms[z])
+
+            return dump_class_object
+
+        elif translation_operation == 4:
+            dump_class_object.atoms[x] = dump_class_object.atoms[x] - min(dump_class_object.atoms[x])
+            dump_class_object.atoms[y] = dump_class_object.atoms[y] + dir_x*min(dump_class_object.atoms[y])
+            dump_class_object.atoms[y] = dump_class_object.atoms[y] - max(dump_class_object.atoms[y])
+            dump_class_object.atoms[z] = dump_class_object.atoms[z] + dir_x*min(dump_class_object.atoms[z])
+            dump_class_object.atoms[z] = dump_class_object.atoms[z] - max(dump_class_object.atoms[z])
+
+            return dump_class_object
+
+        elif translation_operation == 5:
+            dump_class_object.atoms[x] = dump_class_object.atoms[x] + dir_x*min(dump_class_object.atoms[x])
+            dump_class_object.atoms[x] = dump_class_object.atoms[x] - max(dump_class_object.atoms[x])
+            dump_class_object.atoms[y] = dump_class_object.atoms[y] - min(dump_class_object.atoms[y])
+            dump_class_object.atoms[z] = dump_class_object.atoms[z] - min(dump_class_object.atoms[z])
+
+            return dump_class_object
+
+        elif translation_operation == 6:
+            dump_class_object.atoms[x] = dump_class_object.atoms[x] + dir_x*min(dump_class_object.atoms[x])
+            dump_class_object.atoms[x] = dump_class_object.atoms[x] - max(dump_class_object.atoms[x])
+            dump_class_object.atoms[y] = dump_class_object.atoms[y] - min(dump_class_object.atoms[y])
+            dump_class_object.atoms[z] = dump_class_object.atoms[z] + dir_x*min(dump_class_object.atoms[z])
+            dump_class_object.atoms[z] = dump_class_object.atoms[z] - max(dump_class_object.atoms[z])
+
+            return dump_class_object
+
+        elif translation_operation == 7:
+            dump_class_object.atoms[x] = dump_class_object.atoms[x] + dir_x*min(dump_class_object.atoms[x])
+            dump_class_object.atoms[x] = dump_class_object.atoms[x] - max(dump_class_object.atoms[x])
+            dump_class_object.atoms[y] = dump_class_object.atoms[y] + dir_x*min(dump_class_object.atoms[y])
+            dump_class_object.atoms[y] = dump_class_object.atoms[y] - max(dump_class_object.atoms[y])
+            dump_class_object.atoms[z] = dump_class_object.atoms[z] - min(dump_class_object.atoms[z])
+
+            return dump_class_object
+
+        elif translation_operation == 8:
+            dump_class_object.atoms[x] = dump_class_object.atoms[x] + dir_x*min(dump_class_object.atoms[x])
+            dump_class_object.atoms[x] = dump_class_object.atoms[x] - max(dump_class_object.atoms[x])
+            dump_class_object.atoms[y] = dump_class_object.atoms[y] + dir_x*min(dump_class_object.atoms[y])
+            dump_class_object.atoms[y] = dump_class_object.atoms[y] - max(dump_class_object.atoms[y])
+            dump_class_object.atoms[z] = dump_class_object.atoms[z] + dir_x*min(dump_class_object.atoms[z])
+            dump_class_object.atoms[z] = dump_class_object.atoms[z] - max(dump_class_object.atoms[z])
+
+            return dump_class_object
+
+        elif translation_operation == 0:
+
+            dump_class_object.atoms[x] = dump_class_object.atoms[x] - min(dump_class_object.atoms[x])
+            dump_class_object.atoms[y] = dump_class_object.atoms[y] - min(dump_class_object.atoms[y])
+            dump_class_object.atoms[z] = dump_class_object.atoms[z] - min(dump_class_object.atoms[z])
+
+            dump_class_object.atoms[x] = dump_class_object.atoms[x] - (max(dump_class_object.atoms[x])/2)
+            dump_class_object.atoms[y] = dump_class_object.atoms[y] - (max(dump_class_object.atoms[y])/2)
+            dump_class_object.atoms[z] = dump_class_object.atoms[z] - (max(dump_class_object.atoms[z])/2)
+
+            return dump_class_object
+
+        elif type(translation_operation) == list:
+            if all(isinstance(i, (float, int)) for i in translation_operation) and len(translation_operation) == 3:
+                dump_class_object.atoms[x] = dump_class_object.atoms[x] + translation_operation[0]
+                dump_class_object.atoms[y] = dump_class_object.atoms[y] + translation_operation[1]
+                dump_class_object.atoms[z] = dump_class_object.atoms[z] + translation_operation[2]
+
+                return dump_class_object
+
+
             else:
-                dir_x = 1
-
-            if min(atomic_data["y"]) > 0:
-                dir_y = -1
-            else:
-                dir_y = 1
-
-            if min(atomic_data["z"]) > 0:
-                dir_z = -1
-            else:
-                dir_z = 1
-
-            #standard translation_operationtransforms
-            if translation_operation == 1:
-
-                dump_class_object.atoms["x"] = dump_class_object.atoms["x"] - min(dump_class_object.atoms["x"])
-                dump_class_object.atoms["y"] = dump_class_object.atoms["y"] - min(dump_class_object.atoms["y"])
-                dump_class_object.atoms["z"] = dump_class_object.atoms["z"] - min(dump_class_object.atoms["z"])
-
-                return dump_class_object
-
-            elif translation_operation == 2:
-                dump_class_object.atoms["x"] = dump_class_object.atoms["x"] - min(dump_class_object.atoms["x"])
-                dump_class_object.atoms["y"] = dump_class_object.atoms["y"] - min(dump_class_object.atoms["y"])
-                dump_class_object.atoms["z"] = dump_class_object.atoms["z"] + dir_z*min(dump_class_object.atoms["z"])
-                dump_class_object.atoms["z"] = dump_class_object.atoms["z"] - max(dump_class_object.atoms["z"])
-
-                return dump_class_object
-
-            elif translation_operation == 3:
-                dump_class_object.atoms["x"] = dump_class_object.atoms["x"] - min(dump_class_object.atoms["x"])
-                dump_class_object.atoms["y"] = dump_class_object.atoms["y"] + dir_x*min(dump_class_object.atoms["y"])
-                dump_class_object.atoms["y"] = dump_class_object.atoms["y"] - max(dump_class_object.atoms["y"])
-                dump_class_object.atoms["z"] = dump_class_object.atoms["z"] - min(dump_class_object.atoms["z"])
-
-                return dump_class_object
-
-            elif translation_operation == 4:
-                dump_class_object.atoms["x"] = dump_class_object.atoms["x"] - min(dump_class_object.atoms["x"])
-                dump_class_object.atoms["y"] = dump_class_object.atoms["y"] + dir_x*min(dump_class_object.atoms["y"])
-                dump_class_object.atoms["y"] = dump_class_object.atoms["y"] - max(dump_class_object.atoms["y"])
-                dump_class_object.atoms["z"] = dump_class_object.atoms["z"] + dir_x*min(dump_class_object.atoms["z"])
-                dump_class_object.atoms["z"] = dump_class_object.atoms["z"] - max(dump_class_object.atoms["z"])
-
-                return dump_class_object
-
-            elif translation_operation == 5:
-                dump_class_object.atoms["x"] = dump_class_object.atoms["x"] + dir_x*min(dump_class_object.atoms["x"])
-                dump_class_object.atoms["x"] = dump_class_object.atoms["x"] - max(dump_class_object.atoms["x"])
-                dump_class_object.atoms["y"] = dump_class_object.atoms["y"] - min(dump_class_object.atoms["y"])
-                dump_class_object.atoms["z"] = dump_class_object.atoms["z"] - min(dump_class_object.atoms["z"])
-
-                return dump_class_object
-
-            elif translation_operation == 6:
-                dump_class_object.atoms["x"] = dump_class_object.atoms["x"] + dir_x*min(dump_class_object.atoms["x"])
-                dump_class_object.atoms["x"] = dump_class_object.atoms["x"] - max(dump_class_object.atoms["x"])
-                dump_class_object.atoms["y"] = dump_class_object.atoms["y"] - min(dump_class_object.atoms["y"])
-                dump_class_object.atoms["z"] = dump_class_object.atoms["z"] + dir_x*min(dump_class_object.atoms["z"])
-                dump_class_object.atoms["z"] = dump_class_object.atoms["z"] - max(dump_class_object.atoms["z"])
-
-                return dump_class_object
-
-            elif translation_operation == 7:
-                dump_class_object.atoms["x"] = dump_class_object.atoms["x"] + dir_x*min(dump_class_object.atoms["x"])
-                dump_class_object.atoms["x"] = dump_class_object.atoms["x"] - max(dump_class_object.atoms["x"])
-                dump_class_object.atoms["y"] = dump_class_object.atoms["y"] + dir_x*min(dump_class_object.atoms["y"])
-                dump_class_object.atoms["y"] = dump_class_object.atoms["y"] - max(dump_class_object.atoms["y"])
-                dump_class_object.atoms["z"] = dump_class_object.atoms["z"] - min(dump_class_object.atoms["z"])
-
-                return dump_class_object
-
-            elif translation_operation == 8:
-                dump_class_object.atoms["x"] = dump_class_object.atoms["x"] + dir_x*min(dump_class_object.atoms["x"])
-                dump_class_object.atoms["x"] = dump_class_object.atoms["x"] - max(dump_class_object.atoms["x"])
-                dump_class_object.atoms["y"] = dump_class_object.atoms["y"] + dir_x*min(dump_class_object.atoms["y"])
-                dump_class_object.atoms["y"] = dump_class_object.atoms["y"] - max(dump_class_object.atoms["y"])
-                dump_class_object.atoms["z"] = dump_class_object.atoms["z"] + dir_x*min(dump_class_object.atoms["z"])
-                dump_class_object.atoms["z"] = dump_class_object.atoms["z"] - max(dump_class_object.atoms["z"])
-
-                return dump_class_object
-
-            elif translation_operation == 0:
-
-                atomic_data["x"] = atomic_data["x"] - min(atomic_data["x"])
-                atomic_data["y"] = atomic_data["y"] - min(atomic_data["y"])
-                atomic_data["z"] = atomic_data["z"] - min(atomic_data["z"])
-
-                atomic_data["x"] = atomic_data["x"] - (max(atomic_data["x"])/2)
-                atomic_data["y"] = atomic_data["y"] - (max(atomic_data["y"])/2)
-                atomic_data["z"] = atomic_data["z"] - (max(atomic_data["z"])/2)
-
-                return dumpFile(self.timestep,self.boundingtypes,atomic_data)
-
-            elif type(translation_operation) == list:
-                if all(isinstance(i, (float, int)) for i in translation_operation) and len(translation_operation) == 3:
-                    dump_class_object.atoms["x"] = dump_class_object.atoms["x"] + translation_operation[0]
-                    dump_class_object.atoms["y"] = dump_class_object.atoms["y"] + translation_operation[1]
-                    dump_class_object.atoms["z"] = dump_class_object.atoms["z"] + translation_operation[2]
-
-                    return dump_class_object
-
-                else:
-                     raise Exception("Not a valid input to translation function custom list")
-
-            else:
-                 raise Exception("Not a valid input to translation function")
+                 raise Exception("Not a valid input to translation function custom list")
 
         else:
-             raise Exception("Coordinate system specified is not valid")
+             raise Exception("Not a valid input to translation function")
+
 
 
 def multiple_timestep_singular_file_dumps(file_path:str,ids:list = ["TimestepDefault"]):
@@ -413,12 +434,12 @@ def multiple_timestep_singular_file_dumps(file_path:str,ids:list = ["TimestepDef
             if ind < len(indexes)-1:
                 #all except last index
                 df = raw_data.loc[index:indexes[ind+1]-1,:]#making new dataFrame
-                dump_class = dumpFile.raw_file_data(df)#dump class processing
+                dump_class = dumpFile.pandas_to_dumpfile(df)#dump class processing
 
             else:
                 #last index
                 df = raw_data.loc[index:len(raw_data)+1,:]#making new dataFrame
-                dump_class = dumpFile.raw_file_data(df)#dump class processing
+                dump_class = dumpFile.pandas_to_dumpfile(df)#dump class processing
 
             #adding to dictionary
             if ids == ["TimestepDefault"]:
@@ -434,52 +455,38 @@ def multiple_timestep_singular_file_dumps(file_path:str,ids:list = ["TimestepDef
     else:
          warnings.warn("Length of ids list is not equal to files list length")
 
-#def batch_import_files(file_paths:list,ids:list = ["TimestepDefault"], max_simultanius_processes:int = 5):
-"""
-    batch_import_files(file_paths:list,ids:list = ["TimestepDefault"], max_simultanius_processes:int = 5):
+
+def batch_import_files(file_paths:list,ids:list = ["TimestepDefault"]):
+    """
+    this opens several lammps dumps and converts it to a dictionary of
+    dumpFile classes with the keys set to the timesteps
 
     ids:list = ["TimestepDefault"]
     ids are set to the dumpclass timestep by default however if there are duplicates
     this will override the timesteps so you can define the ids for the dictionary
+    """
+    if len(ids) == len(file_paths) or ids == ["TimestepDefault"]:
 
-    This will import several files into a dictionary of dumpFiles
-    dict[id] = dumpFile
+        dump_files = {} #dictionary of class
 
-    this is a predone way to use the concurent.futures module to import several files
-    accross several cores at once
+        for ind,file_path in enumerate(file_paths):
+            #importing class
+            dump_class = dumpFile.lammps_dump(file_path)
 
-    default processes = 5
-"""
-"""
-    #adjusting ids if necessary
-    if ids == ["TimestepDefault"]:
-        ids = ["TimestepDefault" for i in range(len(file_paths))]
+            #adding to dictionary
+            if ids == ["TimestepDefault"]:
+                #using timestep to insert
+                dump_files[int(dump_class.timestep)] = dump_class
+            else:
+                #using custom id
+                dump_files[ids[ind]] = dump_class
 
-    if len(ids) == len(file_paths):
-
-
-
-
-        def chunking(lst, n):
-            for i in range(0, len(lst), n):
-                yield lst[i:i + n]
-
-
-
-        dump_files = {}
-
-
-        #batching ids and files
-        batching_file_paths = [file_paths[i:i + max_simultanius_processes] for i in range(0, len(file_paths), max_simultanius_processes)]
-        batching_ids = [ids[i:i + max_simultanius_processes] for i in range(0, len(ids), max_simultanius_processes)]
-
-
+        return dump_files
 
 
     else:
          warnings.warn("Length of ids list is not equal to files list length")
 
-"""
 
 def write_lammps_dump(file_path:str,dump_class:dumpFile,mode:str = "a"):
     """
@@ -550,45 +557,153 @@ def write_dump_to_data_format(dump_class:dumpFile,file_path:str):
 
     atomic_data = dump_class.atoms[["id","type", "x", "y", "z"]].to_csv(file_path,mode = "a", index = False,header = Flase ,sep = ' ')
 
+def group_translate(dump_files, quadrent):
+    """
+    This takes in a group of dumps in the dictionary format of class and ####translates
+    them as a group the same amount###
 
-dump_class = dumpFile.lammps_dump(r"D:\Mines REU\Data\ThermalMinimization\Thermal_Min_Files\TMin 10e-5 NVT\NEGB 0\TMin_0.0001_NEGB_0_NVT.0")
-#other_dump = dumpFile.lammps_dump(r"D:\Mines REU\Data\NVT_calcs_temp\Base\Moments.0001_NEGB_0_NVT.0")
+    proper call:
+    translated = group_translate(dump_files,quadrent)
 
+    dump_files = {id:class,...}
 
+    The predefined quadrent operations will make sure one boundry is a 0 0 0
 
+    quadrent = x y z
+        0 = centered at 0 0 0
+        1 = + + +
+        2 = + + -
+        3 = + - +
+        4 = + - -
+        5 = - + +
+        6 = - + -
+        7 = - - +
+        8 = - - -
 
-print(dump_class)
-translated = dump_class.translate(0)
-print(dump_class)
-print(translated)
+    Custum Transform:
+     The value is added to the atoms direction from the list in order [x_shift, y_shift, z_shift]
 
-################################################################################
-#Dealing with lammps data files#################################################
-################################################################################
+    """
+    #if custom translation
 
-"""
+    #getting max and min boundings
+    id = dumpFile.id
+    x = dumpFile.x_axis_cart
+    y = dumpFile.y_axis_cart
+    z = dumpFile.z_axis_cart
 
-class dataFile:
+    for ind,dump_class_id in enumerate(dump_files):
+        dump_class = dump_files[dump_class_id]
+        atomic_data = dump_class.atoms
+        #get comparision values
+        x_low_t = min(atomic_data[x])
+        y_low_t = min(atomic_data[y])
+        z_low_t = min(atomic_data[z])
+        x_max_t = max(atomic_data[x])
+        y_max_t = max(atomic_data[y])
+        z_max_t = max(atomic_data[z])
 
-    def __init__(self,atoms,bonds,angles,dihedrals,dihedrals,impropers,atom_types,bond_types,angle_types,dihedral_types,improper_types,extra_bond_per_atom,ellipsoids,lines,triangles,xlo_xhi,ylo_yhi,zlo_zhi,xy_xz_yz):
+        if ind == 0:
+            #establishes starting point
+            x_low = x_low_t
+            y_low = y_low_t
+            z_low = z_low_t
+            x_max = x_max_t
+            y_max = y_max_t
+            z_max = z_max_t
 
+        #updating values if needed
+        if x_low_t < x_low:
+            x_low = x_low_t
+        if y_low_t < y_low:
+            y_low = y_low_t
+        if z_low_t < z_low:
+            z_low = z_low_t
+        if x_max_t < x_max:
+            x_max = x_max_t
+        if y_max_t < y_max:
+            y_max = y_max_t
+        if z_max_t < z_max:
+            z_max = z_max_t
+    #getting correction direction for minimums
+    if x_low > 0:
+        dir_x = -1
+    else:
+        dir_x = 1
 
+    if y_low > 0:
+        dir_y = -1
+    else:
+        dir_y = 1
 
-        ++
-        dihedrals = # of dihedrals in system
-        impropers = # of impropers in system
-        atom_types = # of atom types in system
-        bond_types = # of bond types in system
-        angle_types = # of angle types in system
-        dihedral_types = # of dihedral types in system
-        improper_types = # of improper types in system
-        extra_bond_per_atom = leave space for this many new bonds per atom
-        ellipsoids = # of ellipsoids in system
-        lines = # of line segments in system
-        triangles = # of triangles in system
-        xlo_xhi = simulation box boundaries in x dimension
-        ylo_yhi = simulation box boundaries in y dimension
-        zlo_zhi = simulation box boundaries in z dimension
-        xy_xz_yz = simulation box tilt factors for triclinic system
+    if z_low > 0:
+        dir_z = -1
+    else:
+        dir_z = 1
 
-"""
+    #translating
+
+    if quadrent == 0:
+        tran_x = -(x_max-x_low)/2 + dir_x*x_low
+        tran_y = -(y_max-y_low)/2 + dir_y*y_low
+        tran_z = -(z_max-z_low)/2 + dir_z*z_low
+
+    elif quadrent == 1:
+        tran_x = -x_low
+        tran_y = -y_low
+        tran_z = -z_low
+
+    elif quadrent == 2:
+        tran_x = -x_low
+        tran_y = -y_low
+        tran_z = -z_max+dir_z*(z_max+dir_z*z_low)
+
+    elif quadrent == 3:
+        tran_x = -x_low
+        tran_y = -y_max+dir_y*(y_max+dir_y*y_low)
+        tran_z = -z_low
+
+    elif quadrent == 4:
+        tran_x = -x_low
+        tran_y = -y_max+dir_y*(y_max+dir_y*y_low)
+        tran_z = -z_max+dir_z*(z_max+dir_z*z_low)
+
+    elif quadrent == 5:
+        tran_x = -x_max+dir_x*(x_max+dir_x*x_low)
+        tran_y = -y_low
+        tran_z = -z_low
+
+    elif quadrent == 6:
+        tran_x = -x_max+dir_x*(x_max+dir_x*x_low)
+        tran_y = -y_low
+        tran_z = -z_max+dir_z*(z_max+dir_z*z_low)
+
+    elif quadrent == 7:
+        tran_x = -x_max+dir_x*(x_max+dir_x*x_low)
+        tran_y = -y_max+dir_y*(y_max+dir_y*y_low)
+        tran_z = -z_low
+
+    elif quadrent == 8:
+        tran_x = -x_max+dir_x*(x_max+dir_x*x_low)
+        tran_y = -y_max+dir_y*(y_max+dir_y*y_low)
+        tran_z = -z_max+dir_z*(z_max+dir_z*z_low)
+
+    else:
+        raise Exception("Not a valid quadrent call")
+
+    #transforms
+    translated_dump_files = {}
+    for dump_class_id in dump_files:
+        translated_dump_files[dump_class_id] = dump_files[dump_class_id].translate([tran_x,tran_y,tran_z])
+
+    return translated_dump_files
+
+file_paths = []
+for i in range(0,20001,10000):
+    file_paths.append(fr"D:\Mines REU\Data\Raw\NVT\NEGB_0_NVT\dump.NEGB_0_NVT.{i}")
+
+dump_files = batch_import_files(file_paths,ids = range(0,3))
+print(dump_files)
+
+tran_dumps = group_translate(dump_files, 8)
+print(tran_dumps)
