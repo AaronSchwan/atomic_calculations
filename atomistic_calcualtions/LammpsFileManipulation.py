@@ -33,7 +33,7 @@ import numpy as np
 ################################################################################
 class dumpFile:
 
-    #Important: Update docstrings
+    #IMPORTANT: Update docstrings
 
     """
     This will read a file path that is either a pickle file or a lammps dump
@@ -203,7 +203,7 @@ class dumpFile:
     #dubble under functions#####################################################
     def __repr__(self):
         #returning the atoms by default when calling the function alone
-        return "{TimeStep:"+str(self.timestep)+"\nBoundings"+str(self.boxbounds)+"\nAtomic Data"+str(self.atoms.head)+"}"
+        return "{TimeStep:"+str(self.timestep)+"\nBoundings"+str(self.boxbounds)+"\nColumns of atomic data"+str(self.atoms.columns)+"}"
 
     def __eq__(self,other):
         """
@@ -242,15 +242,17 @@ class dumpFile:
 
 
     #Class functional methods###################################################
-    def translate(self,translate,coordinate_sys = self.active_coordinate_system):
+    def translate(self,translation_operation,coordinate_sys = "active"):
+
         """
         This function transforms the atoms of the class to different quadrents
         labeled below.
 
         The predefined quadrent operations will make sure one boundry is a 0 0 0
 
-        Standards:
+        Standards Cartesian:
          quadrent = x y z
+                0 = centered at 0 0 0
                 1 = + + +
                 2 = + + -
                 3 = + - +
@@ -259,100 +261,134 @@ class dumpFile:
                 6 = - + -
                 7 = - - +
                 8 = - - -
-                9 = centered at 0 0 0
+
         Custum Transform:
          The value is added to the atoms direction from the list in order [x_shift, y_shift, z_shift]
 
         """
 
-        #getting correction direction for minimums
-        if min(self.atoms["x"]) > 0:
-            dir_x = -1
-        else:
-            dir_x = 1
+        #update the coordinate system if needed
+        if coordinate_sys == "active":
+            coordinate_sys = self.active_coordinate_system
 
-        if min(self.atoms["y"]) > 0:
-            dir_y = -1
-        else:
-            dir_y = 1
+        #defining new pandas dataframe to return class instance
+        atomic_data = self.atoms
 
-        if min(self.atoms["z"]) > 0:
-            dir_z = -1
-        else:
-            dir_z = 1
-
-        #standard quadrent transforms
-        if quadrent == 1:
-            self.atoms["x"] = self.atoms["x"] - min(self.atoms["x"])
-            self.atoms["y"] = self.atoms["y"] - min(self.atoms["y"])
-            self.atoms["z"] = self.atoms["z"] - min(self.atoms["z"])
-
-        elif quadrent == 2:
-            self.atoms["x"] = self.atoms["x"] - min(self.atoms["x"])
-            self.atoms["y"] = self.atoms["y"] - min(self.atoms["y"])
-            self.atoms["z"] = self.atoms["z"] + dir_z*min(self.atoms["z"])
-            self.atoms["z"] = self.atoms["z"] - max(self.atoms["z"])
-
-        elif quadrent == 3:
-            self.atoms["x"] = self.atoms["x"] - min(self.atoms["x"])
-            self.atoms["y"] = self.atoms["y"] + dir_x*min(self.atoms["y"])
-            self.atoms["y"] = self.atoms["y"] - max(self.atoms["y"])
-            self.atoms["z"] = self.atoms["z"] - min(self.atoms["z"])
-
-        elif quadrent == 4:
-            self.atoms["x"] = self.atoms["x"] - min(self.atoms["x"])
-            self.atoms["y"] = self.atoms["y"] + dir_x*min(self.atoms["y"])
-            self.atoms["y"] = self.atoms["y"] - max(self.atoms["y"])
-            self.atoms["z"] = self.atoms["z"] + dir_x*min(self.atoms["z"])
-            self.atoms["z"] = self.atoms["z"] - max(self.atoms["z"])
-
-        elif quadrent == 5:
-            self.atoms["x"] = self.atoms["x"] + dir_x*min(self.atoms["x"])
-            self.atoms["x"] = self.atoms["x"] - max(self.atoms["x"])
-            self.atoms["y"] = self.atoms["y"] - min(self.atoms["y"])
-            self.atoms["z"] = self.atoms["z"] - min(self.atoms["z"])
-
-        elif quadrent == 6:
-            self.atoms["x"] = self.atoms["x"] + dir_x*min(self.atoms["x"])
-            self.atoms["x"] = self.atoms["x"] - max(self.atoms["x"])
-            self.atoms["y"] = self.atoms["y"] - min(self.atoms["y"])
-            self.atoms["z"] = self.atoms["z"] + dir_x*min(self.atoms["z"])
-            self.atoms["z"] = self.atoms["z"] - max(self.atoms["z"])
-
-        elif quadrent == 7:
-            self.atoms["x"] = self.atoms["x"] + dir_x*min(self.atoms["x"])
-            self.atoms["x"] = self.atoms["x"] - max(self.atoms["x"])
-            self.atoms["y"] = self.atoms["y"] + dir_x*min(self.atoms["y"])
-            self.atoms["y"] = self.atoms["y"] - max(self.atoms["y"])
-            self.atoms["z"] = self.atoms["z"] - min(self.atoms["z"])
-
-        elif quadrent == 8:
-            self.atoms["x"] = self.atoms["x"] + dir_x*min(self.atoms["x"])
-            self.atoms["x"] = self.atoms["x"] - max(self.atoms["x"])
-            self.atoms["y"] = self.atoms["y"] + dir_x*min(self.atoms["y"])
-            self.atoms["y"] = self.atoms["y"] - max(self.atoms["y"])
-            self.atoms["z"] = self.atoms["z"] + dir_x*min(self.atoms["z"])
-            self.atoms["z"] = self.atoms["z"] - max(self.atoms["z"])
-
-        elif quadrent == 9:
-            self.atoms["x"] = self.atoms["x"] - min(self.atoms["x"])
-            self.atoms["y"] = self.atoms["y"] - min(self.atoms["y"])
-            self.atoms["z"] = self.atoms["z"] - min(self.atoms["z"])
-
-            self.atoms["x"] = self.atoms["x"] - (max(self.atoms["x"])/2)
-            self.atoms["y"] = self.atoms["y"] - (max(self.atoms["y"])/2)
-            self.atoms["z"] = self.atoms["z"] - (max(self.atoms["z"])/2)
-        elif type(quadrent) == list:
-            if all(isinstance(i, (float, int)) for i in quadrent):
-                self.atoms["x"] = self.atoms["x"] + quadrent[0]
-                self.atoms["y"] = self.atoms["y"] + quadrent[1]
-                self.atoms["z"] = self.atoms["z"] + quadrent[2]
+        if coordinate_sys == "cartesian":
+            #getting correction direction for minimums
+            if min(atomic_data["x"]) > 0:
+                dir_x = -1
             else:
-                 raise Exception("Not a valid input to translation function custom list")
+                dir_x = 1
+
+            if min(atomic_data["y"]) > 0:
+                dir_y = -1
+            else:
+                dir_y = 1
+
+            if min(atomic_data["z"]) > 0:
+                dir_z = -1
+            else:
+                dir_z = 1
+
+            #standard translation_operationtransforms
+            if translation_operation == 1:
+
+                dump_class_object.atoms["x"] = dump_class_object.atoms["x"] - min(dump_class_object.atoms["x"])
+                dump_class_object.atoms["y"] = dump_class_object.atoms["y"] - min(dump_class_object.atoms["y"])
+                dump_class_object.atoms["z"] = dump_class_object.atoms["z"] - min(dump_class_object.atoms["z"])
+
+                return dump_class_object
+
+            elif translation_operation == 2:
+                dump_class_object.atoms["x"] = dump_class_object.atoms["x"] - min(dump_class_object.atoms["x"])
+                dump_class_object.atoms["y"] = dump_class_object.atoms["y"] - min(dump_class_object.atoms["y"])
+                dump_class_object.atoms["z"] = dump_class_object.atoms["z"] + dir_z*min(dump_class_object.atoms["z"])
+                dump_class_object.atoms["z"] = dump_class_object.atoms["z"] - max(dump_class_object.atoms["z"])
+
+                return dump_class_object
+
+            elif translation_operation == 3:
+                dump_class_object.atoms["x"] = dump_class_object.atoms["x"] - min(dump_class_object.atoms["x"])
+                dump_class_object.atoms["y"] = dump_class_object.atoms["y"] + dir_x*min(dump_class_object.atoms["y"])
+                dump_class_object.atoms["y"] = dump_class_object.atoms["y"] - max(dump_class_object.atoms["y"])
+                dump_class_object.atoms["z"] = dump_class_object.atoms["z"] - min(dump_class_object.atoms["z"])
+
+                return dump_class_object
+
+            elif translation_operation == 4:
+                dump_class_object.atoms["x"] = dump_class_object.atoms["x"] - min(dump_class_object.atoms["x"])
+                dump_class_object.atoms["y"] = dump_class_object.atoms["y"] + dir_x*min(dump_class_object.atoms["y"])
+                dump_class_object.atoms["y"] = dump_class_object.atoms["y"] - max(dump_class_object.atoms["y"])
+                dump_class_object.atoms["z"] = dump_class_object.atoms["z"] + dir_x*min(dump_class_object.atoms["z"])
+                dump_class_object.atoms["z"] = dump_class_object.atoms["z"] - max(dump_class_object.atoms["z"])
+
+                return dump_class_object
+
+            elif translation_operation == 5:
+                dump_class_object.atoms["x"] = dump_class_object.atoms["x"] + dir_x*min(dump_class_object.atoms["x"])
+                dump_class_object.atoms["x"] = dump_class_object.atoms["x"] - max(dump_class_object.atoms["x"])
+                dump_class_object.atoms["y"] = dump_class_object.atoms["y"] - min(dump_class_object.atoms["y"])
+                dump_class_object.atoms["z"] = dump_class_object.atoms["z"] - min(dump_class_object.atoms["z"])
+
+                return dump_class_object
+
+            elif translation_operation == 6:
+                dump_class_object.atoms["x"] = dump_class_object.atoms["x"] + dir_x*min(dump_class_object.atoms["x"])
+                dump_class_object.atoms["x"] = dump_class_object.atoms["x"] - max(dump_class_object.atoms["x"])
+                dump_class_object.atoms["y"] = dump_class_object.atoms["y"] - min(dump_class_object.atoms["y"])
+                dump_class_object.atoms["z"] = dump_class_object.atoms["z"] + dir_x*min(dump_class_object.atoms["z"])
+                dump_class_object.atoms["z"] = dump_class_object.atoms["z"] - max(dump_class_object.atoms["z"])
+
+                return dump_class_object
+
+            elif translation_operation == 7:
+                dump_class_object.atoms["x"] = dump_class_object.atoms["x"] + dir_x*min(dump_class_object.atoms["x"])
+                dump_class_object.atoms["x"] = dump_class_object.atoms["x"] - max(dump_class_object.atoms["x"])
+                dump_class_object.atoms["y"] = dump_class_object.atoms["y"] + dir_x*min(dump_class_object.atoms["y"])
+                dump_class_object.atoms["y"] = dump_class_object.atoms["y"] - max(dump_class_object.atoms["y"])
+                dump_class_object.atoms["z"] = dump_class_object.atoms["z"] - min(dump_class_object.atoms["z"])
+
+                return dump_class_object
+
+            elif translation_operation == 8:
+                dump_class_object.atoms["x"] = dump_class_object.atoms["x"] + dir_x*min(dump_class_object.atoms["x"])
+                dump_class_object.atoms["x"] = dump_class_object.atoms["x"] - max(dump_class_object.atoms["x"])
+                dump_class_object.atoms["y"] = dump_class_object.atoms["y"] + dir_x*min(dump_class_object.atoms["y"])
+                dump_class_object.atoms["y"] = dump_class_object.atoms["y"] - max(dump_class_object.atoms["y"])
+                dump_class_object.atoms["z"] = dump_class_object.atoms["z"] + dir_x*min(dump_class_object.atoms["z"])
+                dump_class_object.atoms["z"] = dump_class_object.atoms["z"] - max(dump_class_object.atoms["z"])
+
+                return dump_class_object
+
+            elif translation_operation == 0:
+
+                atomic_data["x"] = atomic_data["x"] - min(atomic_data["x"])
+                atomic_data["y"] = atomic_data["y"] - min(atomic_data["y"])
+                atomic_data["z"] = atomic_data["z"] - min(atomic_data["z"])
+
+                atomic_data["x"] = atomic_data["x"] - (max(atomic_data["x"])/2)
+                atomic_data["y"] = atomic_data["y"] - (max(atomic_data["y"])/2)
+                atomic_data["z"] = atomic_data["z"] - (max(atomic_data["z"])/2)
+
+                return dumpFile(self.timestep,self.boundingtypes,atomic_data)
+
+            elif type(translation_operation) == list:
+                if all(isinstance(i, (float, int)) for i in translation_operation) and len(translation_operation) == 3:
+                    dump_class_object.atoms["x"] = dump_class_object.atoms["x"] + translation_operation[0]
+                    dump_class_object.atoms["y"] = dump_class_object.atoms["y"] + translation_operation[1]
+                    dump_class_object.atoms["z"] = dump_class_object.atoms["z"] + translation_operation[2]
+
+                    return dump_class_object
+
+                else:
+                     raise Exception("Not a valid input to translation function custom list")
+
+            else:
+                 raise Exception("Not a valid input to translation function")
+
         else:
-             raise Exception("Not a valid input to translation function")
-
-
+             raise Exception("Coordinate system specified is not valid")
 
 
 def multiple_timestep_singular_file_dumps(file_path:str,ids:list = ["TimestepDefault"]):
@@ -516,17 +552,15 @@ def write_dump_to_data_format(dump_class:dumpFile,file_path:str):
 
 
 dump_class = dumpFile.lammps_dump(r"D:\Mines REU\Data\ThermalMinimization\Thermal_Min_Files\TMin 10e-5 NVT\NEGB 0\TMin_0.0001_NEGB_0_NVT.0")
-other_dump = dumpFile.lammps_dump(r"D:\Mines REU\Data\NVT_calcs_temp\Base\Moments.0001_NEGB_0_NVT.0")
+#other_dump = dumpFile.lammps_dump(r"D:\Mines REU\Data\NVT_calcs_temp\Base\Moments.0001_NEGB_0_NVT.0")
 
-dump_class.translate(1)
-other_dump.translate(1)
 
-merged = dump_class + other_dump
+
 
 print(dump_class)
-print(other_dump)
-
-print(merged)
+translated = dump_class.translate(0)
+print(dump_class)
+print(translated)
 
 ################################################################################
 #Dealing with lammps data files#################################################
